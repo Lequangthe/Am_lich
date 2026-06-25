@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background of the icon (Rounded Square) -->
+    <path
+        android:pathData="M22,22h64a8,8 0,0 1,8 8v64a8,8 0,0 1 -8,8h-64a8,8 0,0 1 -8,-8v-64a8,8 0,0 1,8 -8z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="94"
+                android:endY="54"
+                android:startX="14"
+                android:startY="54"
+                android:type="linear">
+                <item android:color="#FF1E88E5" android:offset="0" />
+                <item android:color="#FFE53935" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Calendar Page Shadow -->
+    <path
+        android:fillColor="#20000000"
+        android:pathData="M30,34h48v48h-48z" />
+
+    <!-- Calendar Page -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,32h52v48a4,4 0,0 1 -4,4h-44a4,4 0,0 1 -4,-4z" />
+
+    <!-- Calendar Header (Gold/Tan) -->
+    <path
+        android:fillColor="#D4AA8C"
+        android:pathData="M28,32h52v10h-52z" />
+
+    <!-- Calendar Rings -->
+    <path
+        android:fillColor="#8D6E63"
+        android:pathData="M34,28h2v8h-2z M42,28h2v8h-2z M50,28h2v8h-2z M58,28h2v8h-2z M66,28h2v8h-2z M74,28h2v8h-2z" />
+
+    <!-- Yin Yang Symbol (Simplified) -->
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M54,58m-8,0a8,8 0,1 1,16 0a8,8 0,1 1 -16,0" />
+    <path
+        android:fillColor="#FF5252"
+        android:pathData="M54,58a8,8 0,0 1 0,16a4,4 0,0 1 0,-8a4,4 0,0 0 0,-8" />
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M54,58a8,8 0,0 0 0,-16a4,4 0,0 0 0,8a4,4 0,0 1 0,8" />
+
+    <!-- Number 18 (Simplified as paths) -->
+    <path
+        android:fillColor="#212121"
+        android:pathData="M38,50h2v16h-2z M44,50a4,4 0,0 1 4,4v2a4,4 0,0 1 -4,4a4,4 0,0 1 4,4v2a4,4 0,0 1 -4,4h-2a4,4 0,0 1 -4,-4v-2a4,4 0,0 1 4,-4a4,4 0,0 1 -4,-4v-2a4,4 0,0 1 4,-4z M44,54h-2v2h2z M44,62h-2v2h2z" />
+
+</vector>
