@@ -40,12 +40,45 @@ fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
     var showConvertDialog by remember { mutableStateOf(false) }
 
     // Input state for conversion
-    var luDay by remember { mutableStateOf("") }
-    var luMonth by remember { mutableStateOf("") }
-    var luYear by remember { mutableStateOf("") }
-    var luLeap by remember { mutableStateOf(false) }
+    var convertMode by remember { mutableIntStateOf(0) } // 0: Am->Duong, 1: Duong->Am
+    var luDayIdx by remember { mutableIntStateOf(-1) }
+    var luMonthIdx by remember { mutableIntStateOf(-1) }
+    var luYearText by remember { mutableStateOf("") }
+    
+    var soDayIdx by remember { mutableIntStateOf(-1) }
+    var soMonthIdx by remember { mutableIntStateOf(-1) }
+    var soYearText by remember { mutableStateOf("") }
+
     var convertResult by remember { mutableStateOf<String?>(null) }
     var convertError by remember { mutableStateOf(false) }
+
+    // Dropdown states
+    var expandedMonth by remember { mutableStateOf(false) }
+    var expandedDay by remember { mutableStateOf(false) }
+    var expandedSoMonth by remember { mutableStateOf(false) }
+    var expandedSoDay by remember { mutableStateOf(false) }
+
+    // Computed from inputs
+    val luYearInt = luYearText.toIntOrNull()
+    val validMonths = remember(luYearInt) {
+        if (luYearInt != null) LunarCalendarUtils.getValidMonthsInYear(luYearInt) else emptyList()
+    }
+    val selectedMonth = if (luMonthIdx in validMonths.indices) validMonths[luMonthIdx] else null
+    val maxDays = remember(luYearInt, selectedMonth) {
+        if (luYearInt != null && selectedMonth != null)
+            LunarCalendarUtils.daysInLunarMonth(selectedMonth.first, luYearInt, selectedMonth.second)
+        else 0
+    }
+    val dayItems = remember(maxDays) { if (maxDays > 0) (1..maxDays).toList() else emptyList() }
+
+    val soYearInt = soYearText.toIntOrNull()
+    val soMonthItems = (1..12).toList()
+    val maxSoDays = remember(soYearInt, soMonthIdx) {
+        if (soYearInt != null && soMonthIdx in 0..11)
+            LunarCalendarUtils.daysInSolarMonth(soMonthIdx + 1, soYearInt)
+        else 31
+    }
+    val soDayItems = (1..maxSoDays).toList()
 
     Scaffold(
         topBar = {
@@ -147,62 +180,224 @@ fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
         }
     }
 
-    // ─── Dialog đổi Âm → Dương ─────────────────────────────────────────────
+    // ─── Dialog đổi Âm ↔ Dương ─────────────────────────────────────────────
     if (showConvertDialog) {
         AlertDialog(
-            onDismissRequest = { showConvertDialog = false; convertResult = null; convertError = false },
-            title = { Text("Đổi Âm lịch → Dương lịch") },
+            onDismissRequest = { 
+                showConvertDialog = false; convertResult = null; convertError = false 
+            },
+            title = { Text("Chuyển đổi Âm - Dương") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = luDay, onValueChange = { luDay = it },
-                            label = { Text("Ngày") }, modifier = Modifier.weight(1f),
-                            singleLine = true
+                    TabRow(
+                        selectedTabIndex = convertMode,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        divider = {}
+                    ) {
+                        Tab(
+                            selected = convertMode == 0,
+                            onClick = { convertMode = 0; convertResult = null; convertError = false },
+                            text = { Text("Âm → Dương", style = MaterialTheme.typography.labelLarge) }
                         )
-                        OutlinedTextField(
-                            value = luMonth, onValueChange = { luMonth = it },
-                            label = { Text("Tháng") }, modifier = Modifier.weight(1f),
-                            singleLine = true
+                        Tab(
+                            selected = convertMode == 1,
+                            onClick = { convertMode = 1; convertResult = null; convertError = false },
+                            text = { Text("Dương → Âm", style = MaterialTheme.typography.labelLarge) }
                         )
                     }
-                    OutlinedTextField(
-                        value = luYear, onValueChange = { luYear = it },
-                        label = { Text("Năm") }, modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = luLeap, onCheckedChange = { luLeap = it })
-                        Text("Tháng nhuận")
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (convertMode == 0) {
+                        // Giao diện Âm -> Dương (như cũ)
+                        OutlinedTextField(
+                            value = luYearText, onValueChange = {
+                                luYearText = it; luMonthIdx = -1; luDayIdx = -1
+                            },
+                            label = { Text("Năm âm lịch") }, modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = expandedMonth,
+                            onExpandedChange = { if (validMonths.isNotEmpty()) expandedMonth = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (selectedMonth != null) {
+                                    if (selectedMonth.second) "Tháng ${selectedMonth.first} (Nhuận)"
+                                    else "Tháng ${selectedMonth.first}"
+                                } else "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Tháng âm lịch") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMonth) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                singleLine = true
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedMonth,
+                                onDismissRequest = { expandedMonth = false }
+                            ) {
+                                validMonths.forEachIndexed { index, (month, isLeap) ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (isLeap) "Tháng $month (Nhuận)" else "Tháng $month") },
+                                        onClick = {
+                                            luMonthIdx = index; luDayIdx = -1; expandedMonth = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        ExposedDropdownMenuBox(
+                            expanded = expandedDay,
+                            onExpandedChange = { if (dayItems.isNotEmpty()) expandedDay = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (luDayIdx in dayItems.indices) dayItems[luDayIdx].toString() else "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Ngày âm lịch") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDay) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                singleLine = true,
+                                enabled = selectedMonth != null
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedDay,
+                                onDismissRequest = { expandedDay = false }
+                            ) {
+                                dayItems.forEachIndexed { index, day ->
+                                    DropdownMenuItem(
+                                        text = { Text("Ngày $day") },
+                                        onClick = { luDayIdx = index; expandedDay = false }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Giao diện Dương -> Âm
+                        OutlinedTextField(
+                            value = soYearText,
+                            onValueChange = { 
+                                soYearText = it; soMonthIdx = -1; soDayIdx = -1 
+                            },
+                            label = { Text("Năm dương lịch") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        
+                        ExposedDropdownMenuBox(
+                            expanded = expandedSoMonth,
+                            onExpandedChange = { expandedSoMonth = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (soMonthIdx in 0..11) "Tháng ${soMonthIdx + 1}" else "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Tháng dương lịch") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSoMonth) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                singleLine = true,
+                                enabled = soYearInt != null
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedSoMonth,
+                                onDismissRequest = { expandedSoMonth = false }
+                            ) {
+                                soMonthItems.forEachIndexed { index, month ->
+                                    DropdownMenuItem(
+                                        text = { Text("Tháng $month") },
+                                        onClick = {
+                                            soMonthIdx = index; soDayIdx = -1; expandedSoMonth = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        ExposedDropdownMenuBox(
+                            expanded = expandedSoDay,
+                            onExpandedChange = { if (soDayItems.isNotEmpty()) expandedSoDay = it }
+                        ) {
+                            OutlinedTextField(
+                                value = if (soDayIdx in soDayItems.indices) soDayItems[soDayIdx].toString() else "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Ngày dương lịch") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSoDay) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                singleLine = true,
+                                enabled = soMonthIdx != -1
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedSoDay,
+                                onDismissRequest = { expandedSoDay = false }
+                            ) {
+                                soDayItems.forEach { day ->
+                                    DropdownMenuItem(
+                                        text = { Text("Ngày $day") },
+                                        onClick = { 
+                                            soDayIdx = day - 1; expandedSoDay = false 
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
+
                     HorizontalDivider()
                     Text("Kết quả", style = MaterialTheme.typography.labelLarge)
                     if (convertError) {
-                        Text("Sai định dạng!", color = MaterialTheme.colorScheme.error)
+                        Text(
+                            if (convertMode == 0) "Vui lòng chọn đầy đủ Ngày, Tháng, Năm âm lịch!"
+                            else "Vui lòng nhập đầy đủ Ngày, Tháng, Năm dương lịch!",
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                     if (convertResult != null) {
-                        Text(convertResult!!, style = MaterialTheme.typography.bodyLarge)
+                        Text(convertResult!!, style = MaterialTheme.typography.bodyLarge, color = Color(0xFF1545A5))
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val d = luDay.toIntOrNull()
-                    val m = luMonth.toIntOrNull()
-                    val y = luYear.toIntOrNull()
-                    if (d != null && m != null && y != null) {
-                        val solar = LunarCalendarUtils.lunarToSolar(d, m, y, luLeap)
-                        val cal = Calendar.getInstance().apply {
-                            set(solar.year, solar.month - 1, solar.day)
+                    if (convertMode == 0) {
+                        // Xử lý Âm -> Dương
+                        if (luDayIdx in dayItems.indices && selectedMonth != null && luYearInt != null) {
+                            val day = dayItems[luDayIdx]
+                            val solar = LunarCalendarUtils.lunarToSolar(day, selectedMonth.first, luYearInt, selectedMonth.second)
+                            val calC = Calendar.getInstance().apply {
+                                set(solar.year, solar.month - 1, solar.day)
+                            }
+                            val thu = LunarCalendarUtils.dayOfWeekFull(calC)
+                            convertResult = "Dương lịch: $thu, ${solar.day}/${solar.month}/${solar.year}"
+                            convertError = false
+                        } else {
+                            convertResult = null
+                            convertError = true
                         }
-                        val thu = LunarCalendarUtils.dayOfWeekFull(cal)
-                        convertResult = "$thu, ${solar.day} Tháng ${solar.month} Năm ${solar.year}"
-                        convertError = false
                     } else {
-                        convertResult = null
-                        convertError = true
+                        // Xử lý Dương -> Âm
+                        val d = if (soDayIdx != -1) soDayItems[soDayIdx] else null
+                        val m = if (soMonthIdx != -1) soMonthIdx + 1 else null
+                        val y = soYearInt
+                        if (d != null && m != null && y != null) {
+                            try {
+                                val lunarRes = LunarCalendarUtils.solarToLunar(d, m, y)
+                                val calC = Calendar.getInstance().apply { set(y, m - 1, d) }
+                                val thu = LunarCalendarUtils.dayOfWeekFull(calC)
+                                convertResult = "Âm lịch: $thu, ngày ${lunarRes.day}/${lunarRes.month}${lunarRes.leapLabel}\nNăm ${lunarRes.tenNam}"
+                                convertError = false
+                            } catch (e: Exception) {
+                                convertResult = "Ngày không hợp lệ!"
+                                convertError = true
+                            }
+                        } else {
+                            convertResult = null
+                            convertError = true
+                        }
                     }
-                }) { Text("Xem") }
+                }) { Text("Chuyển đổi") }
             },
             dismissButton = {
                 TextButton(onClick = {

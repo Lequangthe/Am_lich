@@ -199,12 +199,13 @@ object LunarCalendarUtils {
         var a11 = getLunarMonth11(yy, tz)
         var b11 = a11
         val lunarYear: Int
-        if (a11 >= monthStart) {
+        if (a11 < monthStart) {
             lunarYear = yy
-            a11 = getLunarMonth11(yy - 1, tz)
-        } else {
-            lunarYear = yy + 1
             b11 = getLunarMonth11(yy + 1, tz)
+        } else {
+            lunarYear = yy - 1
+            b11 = a11
+            a11 = getLunarMonth11(yy - 1, tz)
         }
 
         val lunarDay  = dayNumber - monthStart + 1
@@ -214,12 +215,15 @@ object LunarCalendarUtils {
 
         if (b11 - a11 > 365) {
             val leapMonthDiff = getLeapMonthOffset(a11, tz)
-            if (diff >= leapMonthDiff) {
+            if (diff > leapMonthDiff) {
                 lunarMonth = diff + 10
-                if (diff == leapMonthDiff) lunarLeap = true
+            } else if (diff == leapMonthDiff) {
+                lunarMonth = diff + 11
+                lunarLeap = true
             }
         }
         if (lunarMonth > 12) lunarMonth -= 12
+        if (lunarMonth <= 0) lunarMonth += 12
 
         // ── Can Chi ──────────────────────────────────────────────────────────
 
@@ -254,17 +258,25 @@ object LunarCalendarUtils {
         require(lunarMonth in 1..12) { "Lunar month must be 1–12, got $lunarMonth" }
 
         val tz = TIME_ZONE_OFFSET
-        val a11 = getLunarMonth11(lunarYear, tz)
-        val b11 = getLunarMonth11(lunarYear + 1, tz)
+        val a11: Int
+        val b11: Int
+        if (lunarMonth >= 11) {
+            a11 = getLunarMonth11(lunarYear, tz)
+            b11 = getLunarMonth11(lunarYear + 1, tz)
+        } else {
+            a11 = getLunarMonth11(lunarYear - 1, tz)
+            b11 = getLunarMonth11(lunarYear, tz)
+        }
 
         val baseOffset = if (lunarMonth >= 11) lunarMonth - 11 else lunarMonth + 1
 
         val leapOff = if (b11 - a11 > 365) getLeapMonthOffset(a11, tz) else -1
+        require(!lunarLeap || leapOff >= 0) { "Năm $lunarYear không có tháng nhuận" }
 
         val off = when {
             leapOff < 0 -> baseOffset
             lunarLeap -> leapOff
-            baseOffset >= leapOff -> baseOffset + 1
+            baseOffset > leapOff -> baseOffset + 1
             else -> baseOffset
         }
 
@@ -273,6 +285,43 @@ object LunarCalendarUtils {
         val jd = targetNewMoon + lunarDay - 1
         val (sDay, sMonth, sYear) = jdToDate(jd)
         return SolarDate(sDay, sMonth, sYear)
+    }
+
+    // ─── Nâng cấp tự động hóa tháng nhuận ─────────────────────────────────
+
+    fun getLeapMonthInYear(lunarYear: Int): Int {
+        val tz = TIME_ZONE_OFFSET
+        val a11 = getLunarMonth11(lunarYear, tz)
+        val b11 = getLunarMonth11(lunarYear + 1, tz)
+        if (b11 - a11 > 365) {
+            val leapMonthDiff = getLeapMonthOffset(a11, tz)
+            var leapMonth = leapMonthDiff + 11
+            if (leapMonth > 12) leapMonth -= 12
+            return leapMonth
+        }
+        return 0
+    }
+
+    fun getValidMonthsInYear(lunarYear: Int): List<Pair<Int, Boolean>> {
+        val list = mutableListOf<Pair<Int, Boolean>>()
+        val leapMonth = getLeapMonthInYear(lunarYear)
+        for (m in 1..12) {
+            list.add(Pair(m, false))
+            if (m == leapMonth) {
+                list.add(Pair(m, true))
+            }
+        }
+        return list
+    }
+
+    fun daysInLunarMonth(lunarMonth: Int, lunarYear: Int, lunarLeap: Boolean = false): Int {
+        val solarDate30 = lunarToSolar(30, lunarMonth, lunarYear, lunarLeap)
+        val backToLunar = solarToLunar(solarDate30.day, solarDate30.month, solarDate30.year)
+        return if (backToLunar.day == 30 && backToLunar.month == lunarMonth && backToLunar.leap == lunarLeap) {
+            30
+        } else {
+            29
+        }
     }
 
     /** Lấy thông tin ngày hôm nay */
