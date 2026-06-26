@@ -21,6 +21,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.quangthe.amlich.AmLichApp
 import com.quangthe.amlich.notification.FastingLevel
+import com.quangthe.amlich.notification.MonthNotificationType
 import com.quangthe.amlich.notification.FastingPreferences
 import com.quangthe.amlich.notification.FastingWorker
 import kotlinx.coroutines.launch
