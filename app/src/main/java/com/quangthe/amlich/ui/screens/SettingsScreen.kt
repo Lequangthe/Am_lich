@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.quangthe.amlich.AmLichApp
@@ -259,9 +261,26 @@ fun SettingsScreen(
                         }
                     }
                 )
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            if (selectedLevel == FastingLevel.OFF) {
+                                FastingPreferences.setLevel(context, FastingLevel.TWO_DAY)
+                            }
+                            val testWork = OneTimeWorkRequestBuilder<FastingWorker>()
+                                .setInputData(androidx.work.workDataOf(FastingWorker.EXTRA_FORCE_NOTIFY to true))
+                                .build()
+                            WorkManager.getInstance(context).enqueue(testWork)
+                            android.widget.Toast.makeText(context, "Đã gửi thông báo kiểm tra", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3F51B5))
+                ) { Text("Test thông báo ăn chay") }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Section: GIAO DIỆN & WIDGET
             SettingsSection(title = "GIAO DIỆN & WIDGET") {
@@ -304,6 +323,7 @@ fun SettingsScreen(
                         }
                     }
                 )
+
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -322,6 +342,7 @@ fun SettingsScreen(
                         }
                     }
                 )
+
             }
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -400,14 +421,21 @@ private fun updateWorker(context: android.content.Context, level: FastingLevel) 
     val workManager = WorkManager.getInstance(context)
     if (level == FastingLevel.OFF) {
         workManager.cancelUniqueWork("fasting_check")
+        workManager.cancelUniqueWork("fasting_check_immediate")
     } else {
         val request = PeriodicWorkRequestBuilder<FastingWorker>(24, TimeUnit.HOURS)
             .setInitialDelay(AmLichApp.getInitialDelay(), TimeUnit.MILLISECONDS)
             .build()
         workManager.enqueueUniquePeriodicWork(
             "fasting_check",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request
+        )
+        val immediate = OneTimeWorkRequestBuilder<FastingWorker>().build()
+        workManager.enqueueUniqueWork(
+            "fasting_check_immediate",
+            ExistingWorkPolicy.REPLACE,
+            immediate
         )
     }
 }

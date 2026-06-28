@@ -2,8 +2,11 @@ package com.quangthe.amlich
 
 import android.app.Application
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.quangthe.amlich.notification.FastingPreferences
 import com.quangthe.amlich.notification.FastingWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -21,8 +24,14 @@ class AmLichApp : Application() {
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "fasting_check",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request
+        )
+        val immediate = OneTimeWorkRequestBuilder<FastingWorker>().build()
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            "fasting_check_immediate",
+            ExistingWorkPolicy.REPLACE,
+            immediate
         )
     }
 

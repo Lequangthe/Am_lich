@@ -1,6 +1,7 @@
 package com.quangthe.amlich.ui.screens
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -25,13 +27,48 @@ import java.util.Calendar
 @Composable
 fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
 
-    // ─── Ngày hôm nay động ────────────────────────────────────────────────────
-    val (cal, lunar) = remember { LunarCalendarUtils.today() }
-    val dd   = cal.get(Calendar.DAY_OF_MONTH)
-    val mm   = cal.get(Calendar.MONTH) + 1
-    val yy   = cal.get(Calendar.YEAR)
-    val monthHeader = "${LunarCalendarUtils.solarMonthName(mm)} $yy"
+    // ─── Ngày hiện tại (hôm nay) ──────────────────────────────────────────────
+    val todayCal = remember { Calendar.getInstance() }
+    val todayDay = todayCal.get(Calendar.DAY_OF_MONTH)
+    val todayMonth = todayCal.get(Calendar.MONTH) + 1
+    val todayYear = todayCal.get(Calendar.YEAR)
+
+    // ─── Ngày đang xem (có thể điều hướng) ──────────────────────────────────
+    var viewDay by remember { mutableIntStateOf(todayDay) }
+    var viewMonth by remember { mutableIntStateOf(todayMonth) }
+    var viewYear by remember { mutableIntStateOf(todayYear) }
+
+    val lunar = remember(viewDay, viewMonth, viewYear) {
+        LunarCalendarUtils.solarToLunar(viewDay, viewMonth, viewYear)
+    }
+    val monthHeader = "${LunarCalendarUtils.solarMonthName(viewMonth)} $viewYear"
     val lunarPill   = "${lunar.day.toString().padStart(2, '0')} / ${lunar.month.toString().padStart(2, '0')}   ${lunar.tenNam}"
+    val thu = LunarCalendarUtils.dayOfWeekFull(
+        Calendar.getInstance().apply { set(viewYear, viewMonth - 1, viewDay) }
+    )
+    val isToday = viewDay == todayDay && viewMonth == todayMonth && viewYear == todayYear
+
+    fun previousDay() {
+        val c = Calendar.getInstance().apply { set(viewYear, viewMonth - 1, viewDay) }
+        c.add(Calendar.DAY_OF_YEAR, -1)
+        viewDay = c.get(Calendar.DAY_OF_MONTH)
+        viewMonth = c.get(Calendar.MONTH) + 1
+        viewYear = c.get(Calendar.YEAR)
+    }
+
+    fun nextDay() {
+        val c = Calendar.getInstance().apply { set(viewYear, viewMonth - 1, viewDay) }
+        c.add(Calendar.DAY_OF_YEAR, 1)
+        viewDay = c.get(Calendar.DAY_OF_MONTH)
+        viewMonth = c.get(Calendar.MONTH) + 1
+        viewYear = c.get(Calendar.YEAR)
+    }
+
+    fun goToToday() {
+        viewDay = todayDay
+        viewMonth = todayMonth
+        viewYear = todayYear
+    }
 
     // Quote state
     var currentQuote by remember { mutableStateOf(QuoteService.getDailyQuote()) }
@@ -103,6 +140,11 @@ fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
                     IconButton(onClick = { showConvertDialog = true }) {
                         Icon(Icons.Default.SwapHoriz, contentDescription = "Đổi âm dương", modifier = Modifier.size(28.dp))
                     }
+                    if (!isToday) {
+                        IconButton(onClick = { goToToday() }) {
+                            Icon(Icons.Default.Today, contentDescription = "Hôm nay", modifier = Modifier.size(28.dp))
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -121,13 +163,25 @@ fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Month Year Header — kéo lên cao
-            Text(
-                monthHeader,
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color(0xFF000000), //Chỗ này màu chữ "Tháng Một 2026"...
-                letterSpacing = 3.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { previousDay() }) {
+                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Ngày trước", tint = Color(0xFF3F51B5))
+                }
+                Text(
+                    monthHeader,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color(0xFF000000), //Chỗ này màu chữ "Tháng Một 2026"...
+                    letterSpacing = 3.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                IconButton(onClick = { nextDay() }) {
+                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Ngày sau", tint = Color(0xFF3F51B5))
+                }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -138,17 +192,42 @@ fun DailyCalendarScreen(onTabClick: (String) -> Unit = {}) {
                     .height(440.dp)
                     .clip(RoundedCornerShape(40.dp))
                     .background(Color.White) //Chỗ này màu nền ô vuông chứa số ngày
-                    .border(1.5.dp, Color(0xFF03A9F4), RoundedCornerShape(40.dp)), //Chỗ này màu viền ô vuông số ngày
+                    .border(1.5.dp, Color(0xFF03A9F4), RoundedCornerShape(40.dp)) //Chỗ này màu viền ô vuông số ngày
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onHorizontalDrag = { _, dragAmount ->
+                                totalDrag += dragAmount
+                                if (totalDrag > 100) {
+                                    totalDrag = 0f; previousDay()
+                                } else if (totalDrag < -100) {
+                                    totalDrag = 0f; nextDay()
+                                }
+                            },
+                            onDragEnd = { totalDrag = 0f },
+                            onDragCancel = { totalDrag = 0f }
+                        )
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    dd.toString(),
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 200.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF1545A5) //Chỗ này màu chữ số ngày (lớn)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        viewDay.toString(),
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = 200.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF1545A5) //Chỗ này màu chữ số ngày (lớn)
+                        )
                     )
-                )
+                    Text(
+                        thu,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1545A5).copy(alpha = 0.7f)
+                        )
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
