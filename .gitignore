@@ -15,6 +15,7 @@ local.properties
 *.apk
 *.aar
 *.jar
+app/release/
 
 # System files
 .DS_Store
