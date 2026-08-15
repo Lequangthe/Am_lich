@@ -91,22 +91,25 @@ object LunarCalendarUtils {
 
     /** ΔT (sai số đồng hồ thiên văn) tính theo ngày */
     private fun deltaT(T: Double): Double {
-        val T2 = T * T
-        val T3 = T2 * T
+        val y = 2000 + T * 100
         return when {
-            T < -11.0 -> {
-                // Cổ đại: giữ công thức gốc
+            y < 948 -> {
+                val T2 = T * T
+                val T3 = T2 * T
                 0.001 + 0.000839 * T + 0.0002261 * T2 -
                         0.00000845 * T3 - 0.000000081 * T * T3
             }
-            T > 2.0 -> {
-                // Tương lai xa (>2100): parabolic extrapolation
-                val t = T - 1.0   // centuries từ J2000
-                (-20.0 + 32.0 * t * t) / 86400.0
+            y < 2000 -> {
+                val T2 = T * T
+                (-0.000278 + 0.000265 * T + 0.000262 * T2)
+            }
+            y < 2050 -> {
+                val t = y - 2000
+                (62.92 + 0.32217 * t + 0.005589 * t * t) / 86400.0
             }
             else -> {
-                // Hiện đại (100 TCN – 2100 CN): công thức đã kiểm định
-                -0.000278 + 0.000265 * T + 0.000262 * T2
+                val t = T - 1.0
+                (-20.0 + 32.0 * t * t) / 86400.0
             }
         }
     }
@@ -116,25 +119,30 @@ object LunarCalendarUtils {
         val T  = k / 1236.85
         val T2 = T * T
         val T3 = T2 * T
+        val dr = Math.PI / 180
+
         var Jd1 = 2415020.75933 + 29.53058868 * k +
                 0.0001178 * T2 - 0.000000155 * T3
-        Jd1 += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * Math.PI / 180)
+        Jd1 += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * dr)
+
         val M   = 359.2242  + 29.10535608  * k - 0.0000333  * T2 - 0.00000347  * T3
         val Mpr = 306.0253  + 385.81691806 * k + 0.0107306  * T2 + 0.00001236  * T3
         val F   = 21.2964   + 390.67050646 * k - 0.0016528  * T2 - 0.00000239  * T3
-        var C1  = (0.1734 - 0.000393 * T) * Math.sin(M   * Math.PI / 180) +
-                0.0021 * Math.sin(2 * M * Math.PI / 180)
-        C1 -= 0.4068 * Math.sin(Mpr * Math.PI / 180) +
-                0.0161 * Math.sin(2 * Mpr * Math.PI / 180)
-        C1 -= 0.0004 * Math.sin(3 * Mpr * Math.PI / 180)
-        C1 += 0.0104 * Math.sin(2 * F   * Math.PI / 180) -
-                0.0051 * Math.sin((M + Mpr) * Math.PI / 180)
-        C1 -= 0.0074 * Math.sin((M - Mpr) * Math.PI / 180) +
-                0.0004 * Math.sin((2 * F + M) * Math.PI / 180)
-        C1 -= 0.0004 * Math.sin((2 * F - M) * Math.PI / 180) -
-                0.0006 * Math.sin((2 * F + Mpr) * Math.PI / 180)
-        C1 += 0.0010 * Math.sin((2 * F - Mpr) * Math.PI / 180) +
-                0.0005 * Math.sin((M + 2 * Mpr) * Math.PI / 180)
+
+        var C1  = (0.1734 - 0.000393 * T) * Math.sin(M * dr)
+        C1 += 0.0021 * Math.sin(2 * M * dr)
+        C1 -= 0.4068 * Math.sin(Mpr * dr)
+        C1 += 0.0161 * Math.sin(2 * Mpr * dr)
+        C1 -= 0.0004 * Math.sin(3 * Mpr * dr)
+        C1 += 0.0104 * Math.sin(2 * F * dr)
+        C1 -= 0.0051 * Math.sin((M + Mpr) * dr)
+        C1 -= 0.0074 * Math.sin((M - Mpr) * dr)
+        C1 += 0.0004 * Math.sin((2 * F + M) * dr)
+        C1 -= 0.0004 * Math.sin((2 * F - M) * dr)
+        C1 -= 0.0006 * Math.sin((2 * F + Mpr) * dr)
+        C1 += 0.0010 * Math.sin((2 * F - Mpr) * dr)
+        C1 += 0.0005 * Math.sin((M + 2 * Mpr) * dr)
+
         return Jd1 + C1 - deltaT(T)
     }
 
@@ -227,13 +235,15 @@ object LunarCalendarUtils {
 
         // ── Can Chi ──────────────────────────────────────────────────────────
 
-        // Năm: Giáp Tý = 1984 → (1984+6)%10=0, (1984+8)%12=0 ✓
-        val canNamIdx  = (lunarYear + 6) % 10
-        val chiNamIdx  = (lunarYear + 8) % 12
+        // Năm âm lịch (tên năm) chuyển đổi vào ngày mồng 1 tết (tháng 1)
+        val canChiYear = if (lunarMonth >= 11) lunarYear else lunarYear + 1
+
+        val canNamIdx  = (canChiYear + 6) % 10
+        val chiNamIdx  = (canChiYear + 8) % 12
 
         // Tháng: dùng Long để tránh overflow; guard âm bằng posMod
-        val canThangIdx = posMod((lunarYear.toLong() * 12 + lunarMonth + 3), 10)
-        val chiThangIdx = (lunarMonth + 1) % 12   // tháng 1→Dần(2), kiểm: (1+1)%12=2 ✓
+        val canThangIdx = posMod((canChiYear.toLong() * 12 + lunarMonth + 3), 10)
+        val chiThangIdx = (lunarMonth + 1) % 12
 
         // Ngày: dùng posMod tránh JVM % âm
         val canNgayIdx = posMod(dayNumber + 9, 10)
