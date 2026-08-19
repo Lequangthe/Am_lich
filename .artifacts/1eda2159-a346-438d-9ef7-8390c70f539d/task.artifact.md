@@ -1,0 +1,6 @@
+- [x] Fix `deltaT` year reference (1900 instead of 2000)
+- [x] Correct `newMoon` signs and constants
+- [x] Update `lunarMonth` normalization in `solarToLunar`
+- [x] Fix `lunarYear` result and Can Chi year change logic
+- [x] Apply `posMod` to all `CAN`/`CHI` array accesses
+- [x] Verify fix by checking today's lunar date and widget status

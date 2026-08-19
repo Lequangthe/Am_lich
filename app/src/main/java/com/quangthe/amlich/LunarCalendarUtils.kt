@@ -91,25 +91,23 @@ object LunarCalendarUtils {
 
     /** ΔT (sai số đồng hồ thiên văn) tính theo ngày */
     private fun deltaT(T: Double): Double {
-        val y = 2000 + T * 100
+        val y = 1900 + T * 100
         return when {
             y < 948 -> {
-                val T2 = T * T
-                val T3 = T2 * T
-                0.001 + 0.000839 * T + 0.0002261 * T2 -
-                        0.00000845 * T3 - 0.000000081 * T * T3
+                val t = (y - 1820) / 100.0
+                (21.7 + 77.0 * t + 158.0 * t * t) / 86400.0
             }
             y < 2000 -> {
-                val T2 = T * T
-                (-0.000278 + 0.000265 * T + 0.000262 * T2)
+                val t = (y - 2000) / 100.0
+                (64.12 + 202.36 * t + 303.3 * t * t + 570.6 * t * t * t + 222.0 * t * t * t * t) / 86400.0
             }
             y < 2050 -> {
                 val t = y - 2000
                 (62.92 + 0.32217 * t + 0.005589 * t * t) / 86400.0
             }
             else -> {
-                val t = T - 1.0
-                (-20.0 + 32.0 * t * t) / 86400.0
+                val t = (y - 2000) / 100.0
+                (0.5 + 32.0 * t * t) / 86400.0
             }
         }
     }
@@ -136,7 +134,7 @@ object LunarCalendarUtils {
         C1 -= 0.0004 * Math.sin(3 * Mpr * dr)
         C1 += 0.0104 * Math.sin(2 * F * dr)
         C1 -= 0.0051 * Math.sin((M + Mpr) * dr)
-        C1 -= 0.0074 * Math.sin((M - Mpr) * dr)
+        C1 += 0.0074 * Math.sin((M - Mpr) * dr)
         C1 += 0.0004 * Math.sin((2 * F + M) * dr)
         C1 -= 0.0004 * Math.sin((2 * F - M) * dr)
         C1 -= 0.0006 * Math.sin((2 * F + Mpr) * dr)
@@ -226,24 +224,23 @@ object LunarCalendarUtils {
             if (diff > leapMonthDiff) {
                 lunarMonth = diff + 10
             } else if (diff == leapMonthDiff) {
-                lunarMonth = diff + 11
+                lunarMonth = diff + 10
                 lunarLeap = true
             }
         }
-        if (lunarMonth > 12) lunarMonth -= 12
-        if (lunarMonth <= 0) lunarMonth += 12
+        lunarMonth = posMod(lunarMonth - 1, 12) + 1
 
         // ── Can Chi ──────────────────────────────────────────────────────────
 
         // Năm âm lịch (tên năm) chuyển đổi vào ngày mồng 1 tết (tháng 1)
         val canChiYear = if (lunarMonth >= 11) lunarYear else lunarYear + 1
 
-        val canNamIdx  = (canChiYear + 6) % 10
-        val chiNamIdx  = (canChiYear + 8) % 12
+        val canNamIdx  = posMod(canChiYear + 6, 10)
+        val chiNamIdx  = posMod(canChiYear + 8, 12)
 
         // Tháng: dùng Long để tránh overflow; guard âm bằng posMod
         val canThangIdx = posMod((canChiYear.toLong() * 12 + lunarMonth + 3), 10)
-        val chiThangIdx = (lunarMonth + 1) % 12
+        val chiThangIdx = posMod(lunarMonth + 1, 12)
 
         // Ngày: dùng posMod tránh JVM % âm
         val canNgayIdx = posMod(dayNumber + 9, 10)
@@ -252,7 +249,7 @@ object LunarCalendarUtils {
         return LunarDate(
             day      = lunarDay,
             month    = lunarMonth,
-            year     = lunarYear,
+            year     = canChiYear, // Trả về năm âm lịch khớp với Can Chi
             leap     = lunarLeap,
             canNam   = CAN[canNamIdx],
             chiNam   = CHI[chiNamIdx],
@@ -301,8 +298,8 @@ object LunarCalendarUtils {
 
     fun getLeapMonthInYear(lunarYear: Int): Int {
         val tz = TIME_ZONE_OFFSET
-        val a11 = getLunarMonth11(lunarYear, tz)
-        val b11 = getLunarMonth11(lunarYear + 1, tz)
+        val a11 = getLunarMonth11(lunarYear - 1, tz)
+        val b11 = getLunarMonth11(lunarYear, tz)
         if (b11 - a11 > 365) {
             val leapMonthDiff = getLeapMonthOffset(a11, tz)
             var leapMonth = leapMonthDiff + 11
